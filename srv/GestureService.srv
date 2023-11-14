@@ -1,0 +1,4 @@
+string filename
+float32 duration
+---
+bool ack
