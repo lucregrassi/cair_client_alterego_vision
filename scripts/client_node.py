@@ -3,7 +3,7 @@
 from cairlib.DialogueStatistics import DialogueStatistics
 from cairlib.DialogueState import DialogueState
 from cairlib.DialogueTurn import DialogueTurn
-from cairlib.CAIRclient_utils import Utils
+from cairlib.CAIRclient_alterego_utils import Utils
 from playsound import playsound
 from gtts import gTTS
 from openai import OpenAI
@@ -11,7 +11,7 @@ from pydub import AudioSegment
 from pydub.playback import play
 from mutagen.mp3 import MP3
 from dotenv import load_dotenv, find_dotenv
-from cairclient_base.srv import GestureService
+from cairclient_alterego_vision.srv import GestureService
 import xml.etree.ElementTree as ET
 import pygame.camera
 import threading
@@ -33,14 +33,14 @@ import rospy
 import rospkg
 
 rp = rospkg.RosPack()
-package_path = rp.get_path('cairclient_vision')
+package_path = rp.get_path('cairclient_alterego_vision')
 folder_path = package_path + "/common" 
 
 # Location of the server
 cineca = "131.175.205.146"
 local = "130.251.13.180"
 server_ip = local
-audio_recorder_ip = local
+audio_recorder_ip = "130.251.13.173"
 registration_ip = local
 language = "it"
 max_history_turns = 6
@@ -123,7 +123,7 @@ class CAIRclient:
         self.plan = ""
         # This variable tells if the user want the robot to repeat a sentence
         self.repeat = False
-
+        
         # Read the sentences in the correct language from the file
         sentences_file_path = os.path.join(folder_path, "sentences_" + language + ".txt")
         self.sentences = []
@@ -231,10 +231,11 @@ class CAIRclient:
             welcome_str = welcome_back_msg
 
         print("R:", welcome_str)
-        duration = mp3_duration(self.audio_file_path)
-        gesture_service_client("talk", duration)
         tts = gTTS(welcome_str, lang=language)
         tts.save(self.audio_file_path)
+        duration = mp3_duration(self.audio_file_path)
+        welcome_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+        welcome_thread.start()
         playsound(self.audio_file_path)
         # stream_and_play(welcome_str)
         self.previous_sentence = welcome_str
@@ -283,10 +284,11 @@ class CAIRclient:
                 else:
                     to_say = "I'm sorry, there was a problem with the connection to the external microphone."
                 print("R:", to_say)
-                duration = mp3_duration(self.audio_file_path)
-                gesture_service_client("talk", duration)
                 tts = gTTS(to_say, lang=language)
                 tts.save(self.audio_file_path)
+                # duration = mp3_duration(self.audio_file_path)
+                # mic_err_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                # mic_err_thread.start()
                 playsound(self.audio_file_path)
                 # stream_and_play(to_say)
                 sys.exit(1)
@@ -393,10 +395,12 @@ class CAIRclient:
                 if openai:
                     random_sent = random.choice(self.sentences)
                     print("R:", random_sent)
-                    duration = mp3_duration(self.audio_file_path)
-                    gesture_service_client("talk", duration)
+                    
                     tts = gTTS(random_sent, lang=language)
                     tts.save(self.audio_file_path)
+                    duration = mp3_duration(self.audio_file_path)
+                    rand_sent_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                    rand_sent_thread.start()
                     playsound(self.audio_file_path)
                     # stream_and_play(random_sent)
 
@@ -410,10 +414,11 @@ class CAIRclient:
                     self.plan_sentence = self.utils.replace_schwa_in_string(self.plan_sentence, self.speakers_info,
                                                                             speaker_id)
                     print("R:", self.plan_sentence)
-                    duration = mp3_duration(self.audio_file_path)
-                    gesture_service_client("talk", duration)
                     tts = gTTS(self.plan_sentence, lang=language)
                     tts.save(self.audio_file_path)
+                    duration = mp3_duration(self.audio_file_path)
+                    plan_sent_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                    plan_sent_thread.start()
                     playsound(self.audio_file_path)
                     # os.system("afplay audio.mp3")
                     # stream_and_play(self.plan_sentence)
@@ -459,10 +464,12 @@ class CAIRclient:
                     req_thread.start()
 
                 print("R:", dialogue_sentence1_str)
-                duration = mp3_duration(self.audio_file_path)
-                gesture_service_client("talk", duration)
+            
                 tts = gTTS(dialogue_sentence1_str, lang=language)
                 tts.save(self.audio_file_path)
+                duration = mp3_duration(self.audio_file_path)
+                dialogue1_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                dialogue1_thread.start()
                 playsound(self.audio_file_path)
                 # os.system("afplay audio.mp3")
                 # stream_and_play(dialogue_sentence1_str)
@@ -476,11 +483,13 @@ class CAIRclient:
                     dialogue_sentence2_str = self.utils.replace_speaker_name(dialogue_sentence2_history,
                                                                              self.speakers_info)
                     print("R:", dialogue_sentence2_str)
-                    duration = mp3_duration("audio.mp3")
-                    gesture_service_client("talk", duration)
+                    
                     tts = gTTS(dialogue_sentence2_str, lang=language)
-                    tts.save("audio.mp3")
-                    playsound("audio.mp3")
+                    tts.save(self.audio_file_path)
+                    duration = mp3_duration(self.audio_file_path)
+                    dialogue2_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                    dialogue2_thread.start()
+                    playsound(self.audio_file_path)
                     # stream_and_play(dialogue_sentence2_str)
                 else:
                     dialogue_sentence2_history = ""
