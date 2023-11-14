@@ -2,7 +2,7 @@ scripts/.env
 common/dialogue_state.json
 common/dialogue_statistics.json
 common/speakers_info.json
-common/camera_image.json
+common/camera_image.jpg
 common/audio.mp3
 
 devel/
