@@ -79,15 +79,6 @@ def stream_and_play(text):
     # Play the audio
     play(audio)
 
-def gesture_service_client(filename, duration):
-    # Blocking call that waits for server
-    rospy.wait_for_service('gesture_service')
-    try:
-        gesture_service = rospy.ServiceProxy('gesture_service', GestureService)
-        response = gesture_service(filename, duration)
-        # rospy.loginfo("Service response: %s", response)
-    except rospy.ServiceException as e:
-        rospy.logerr("Service call failed: %s", e)
 
 def mp3_duration(path):
     try:
@@ -133,6 +124,18 @@ class CAIRclient:
         self.dense_cap = dense_cap
         self.dense_cap_result = dense_cap_result
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.offset = 0
+        
+    def gesture_service_client(self, filename, duration, offset):
+        # Blocking call that waits for server
+        rospy.wait_for_service('gesture_service')
+        try:
+            gesture_service = rospy.ServiceProxy('gesture_service', GestureService)
+            response = gesture_service(filename, duration, offset)
+            self.offset = response.offset
+            rospy.loginfo("**NEW OFFSET: %f", self.offset)
+        except rospy.ServiceException as e:
+            rospy.logerr("Service call failed: %s", e)
         
     def print_used_nuances(self, dialogue_nuances):
         print("________USED NUANCES________")
@@ -234,7 +237,8 @@ class CAIRclient:
         tts = gTTS(welcome_str, lang=language)
         tts.save(self.audio_file_path)
         duration = mp3_duration(self.audio_file_path)
-        welcome_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+        filename = "talk" + str(random.randint(0, 9)) + ".bag"
+        welcome_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, 0,))
         welcome_thread.start()
         playsound(self.audio_file_path)
         # stream_and_play(welcome_str)
@@ -271,6 +275,8 @@ class CAIRclient:
             t1.start()
 
         while self.isAlive:
+            self.offset = 0.0
+            filename = "talk" + str(random.randint(0, 9)) + ".bag"
             print("** Listening **")
             if os.path.exists(self.audio_file_path):
                 os.remove(self.audio_file_path)
@@ -287,7 +293,7 @@ class CAIRclient:
                 tts = gTTS(to_say, lang=language)
                 tts.save(self.audio_file_path)
                 # duration = mp3_duration(self.audio_file_path)
-                # mic_err_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                # mic_err_thread = threading.Thread(None, gesture_service_client, args=("talk", duration, self.offset,))
                 # mic_err_thread.start()
                 playsound(self.audio_file_path)
                 # stream_and_play(to_say)
@@ -399,7 +405,7 @@ class CAIRclient:
                     tts = gTTS(random_sent, lang=language)
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
-                    rand_sent_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                    rand_sent_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, self.offset,))
                     rand_sent_thread.start()
                     playsound(self.audio_file_path)
                     # stream_and_play(random_sent)
@@ -417,7 +423,7 @@ class CAIRclient:
                     tts = gTTS(self.plan_sentence, lang=language)
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
-                    plan_sent_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                    plan_sent_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, self.offset,))
                     plan_sent_thread.start()
                     playsound(self.audio_file_path)
                     # os.system("afplay audio.mp3")
@@ -468,7 +474,7 @@ class CAIRclient:
                 tts = gTTS(dialogue_sentence1_str, lang=language)
                 tts.save(self.audio_file_path)
                 duration = mp3_duration(self.audio_file_path)
-                dialogue1_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                dialogue1_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, self.offset,))
                 dialogue1_thread.start()
                 playsound(self.audio_file_path)
                 # os.system("afplay audio.mp3")
@@ -487,7 +493,7 @@ class CAIRclient:
                     tts = gTTS(dialogue_sentence2_str, lang=language)
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
-                    dialogue2_thread = threading.Thread(None, gesture_service_client, args=("talk", duration,))
+                    dialogue2_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, self.offset,))
                     dialogue2_thread.start()
                     playsound(self.audio_file_path)
                     # stream_and_play(dialogue_sentence2_str)
