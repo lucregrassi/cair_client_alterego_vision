@@ -1,5 +1,5 @@
 string filename
-float32 duration
+float32 gesture_duration
 float32 offset
 ---
 float32 offset
