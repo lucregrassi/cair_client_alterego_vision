@@ -126,12 +126,12 @@ class CAIRclient:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.offset = 0
         
-    def gesture_service_client(self, filename, duration, offset):
+    def gesture_service_client(self, filename, gesture_duration, offset):
         # Blocking call that waits for server
         rospy.wait_for_service('gesture_service')
         try:
             gesture_service = rospy.ServiceProxy('gesture_service', GestureService)
-            response = gesture_service(filename, duration, offset)
+            response = gesture_service(filename, gesture_duration, offset)
             self.offset = response.offset
             rospy.loginfo("**NEW OFFSET: %f", self.offset)
         except rospy.ServiceException as e:
