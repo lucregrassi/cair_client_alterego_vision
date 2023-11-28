@@ -343,6 +343,10 @@ class CAIRclient:
                 print("R:", goodbye_msg)
                 tts = gTTS(goodbye_msg, lang=language)
                 tts.save(self.audio_file_path)
+                duration = mp3_duration(self.audio_file_path)
+                goodbye_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, self.offset,))
+                goodbye_thread.start()
+                time.sleep(1)
                 playsound(self.audio_file_path)
                 sys.exit(0)
             # If the user said a Repeat keyword
