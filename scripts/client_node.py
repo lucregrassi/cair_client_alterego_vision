@@ -38,8 +38,8 @@ folder_path = package_path + "/common"
 
 # Location of the server
 cineca = "131.175.205.146"
-local = "130.251.13.180"
-server_ip = local
+local = "130.251.13.130"
+server_ip = cineca
 audio_recorder_ip = "130.251.13.173"
 registration_ip = local
 language = "it"
@@ -522,6 +522,6 @@ if __name__ == '__main__':
         language = args.language
         print("The language has been set to", language)
 
-    rospy.init_node('gesture_service_client', anonymous=True)
+    rospy.init_node('gesture_service_client', anonymous=False)
     cair_client = CAIRclient()
     cair_client.start_dialogue()
