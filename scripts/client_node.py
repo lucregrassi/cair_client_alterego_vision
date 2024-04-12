@@ -361,7 +361,6 @@ class CAIRclient:
             print("** received user sentence **")
             self.check_socket_connection(xml_string)
 
-
             # Do not proceed until the xml string is complete and all tags are closed
             proceed = False
             while not proceed:
@@ -463,21 +462,6 @@ class CAIRclient:
                 # Create the thread for the first request
                 req_thread = threading.Thread(target=self.hub_request, args=(data,))
                 req_thread.start()
-
-                # # When using openAI say something to fill the void while waiting
-                if openai:
-                    random_sent = random.choice(self.sentences)
-                    print("R:", random_sent)
-                    
-                    tts = gTTS(random_sent, lang=language)
-                    tts.save(self.audio_file_path)
-                    duration = mp3_duration(self.audio_file_path)
-                    rand_sent_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, self.offset,))
-                    rand_sent_thread.start()
-                    time.sleep(1)
-                    playsound(self.audio_file_path)
-                    # stream_and_play(random_sent)
-
                 # Wait for the thread to finish
                 req_thread.join()
 
