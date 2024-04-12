@@ -31,18 +31,19 @@ import io
 import openai
 import rospy
 import rospkg
+from datetime import datetime
 
 rp = rospkg.RosPack()
 package_path = rp.get_path('cairclient_alterego_vision')
 folder_path = package_path + "/common" 
 
 # Location of the server
-cineca = "131.175.205.146"
-local = "130.251.13.130"
-server_ip = cineca
-audio_recorder_ip = "130.251.13.173"
+lab_server = "130.251.13.192"
+local = "200.200.200.111"
+server_ip = lab_server
+audio_recorder_ip = local
 registration_ip = local
-language = "it"
+language = "en"
 max_history_turns = 6
 
 openai.organization = "org-OWePijhLCGVSJWhT7TQXBK7D"
@@ -53,7 +54,7 @@ client = OpenAI()
 # OpenAI
 openai = True
 if openai:
-    server_port = "5005"
+    server_port = "12349"
 else:
     server_port = "5000"
 request_uri = "http://" + server_ip + ":" + server_port + "/CAIR_hub"
@@ -62,7 +63,7 @@ request_uri = "http://" + server_ip + ":" + server_port + "/CAIR_hub"
 # visual information will not be used by gpt-4
 dense_cap = True
 dense_cap_result = []
-img_port = "5010"
+img_port = "12348"
 img_url = "http://" + server_ip + ":" + img_port + "/CAIR_dense_captioning"
 
 
@@ -124,6 +125,7 @@ class CAIRclient:
         self.dense_cap = dense_cap
         self.dense_cap_result = dense_cap_result
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.log_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.offset = 0
         
     def gesture_service_client(self, filename, audio_duration, offset):
@@ -137,6 +139,20 @@ class CAIRclient:
         except rospy.ServiceException as e:
             rospy.logerr("Service call failed: %s", e)
         
+    def check_socket_connection(self, received_string):
+        if received_string == "":
+            if language == "it":
+                to_say = "Mi dispiace, c'è stato qualche problema con la connessione al microfono esterno."
+            else:
+                to_say = "I'm sorry, there was a problem with the connection to the external microphone."
+            print("R:", to_say)
+            # tts = gTTS(to_say, lang=language)
+            # tts.save("audio.mp3")
+            # playsound("audio.mp3")
+            # os.system("afplay audio.mp3")
+            # stream_and_play(to_say)
+            sys.exit(1)
+
     def print_used_nuances(self, dialogue_nuances):
         print("________USED NUANCES________")
         for key, value in dialogue_nuances["flags"].items():
@@ -158,25 +174,67 @@ class CAIRclient:
         screen = pygame.surface.Surface((WIDTH, HEIGHT))
 
         while True:
+            # Take the timestamp at the beginning of the loop to process vision information
+            now = datetime.now()
+            date_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
             # Capture an image
+            image_capture_start_time = time.time()
             screen = cam.get_image(screen)
             # Save the image
-            pygame.image.save(screen, self.camera_image_path)
-            with open(self.camera_image_path, "rb") as img_file:
+            pygame.image.save(screen, "camera_image.jpg")
+            with open("camera_image.jpg", "rb") as img_file:
                 # Encode your image with base64 and convert it to string
                 img_encoded = base64.b64encode(img_file.read()).decode('utf-8')
+            image_capture_end_time = time.time()
+            image_byte_size = (len(img_encoded)*3)/4
+
             # Create a dictionary with the encoded image
             data = {"frame": img_encoded}
             # Send the image to the server using a POST request
-            response = requests.post(img_url, json=data)
-            # Print the server's response
-            self.dense_cap_result = response.json()["result"]
-            time.sleep(3.5)
+            try:
+                request_start_time = time.time()
+                response = requests.post(img_url, json=data)
+                self.dense_cap_result = response.json()["result"]
+                request_end_time = time.time()
+                to_log = "v#timestamp:" + date_time_str + "\n"
+                self.log_socket.send(to_log.encode("utf-8"))
+                to_log = "v#image_capture_time:" + str(image_capture_end_time - image_capture_start_time) + "\n"
+                self.log_socket.send(to_log.encode("utf-8"))
+                to_log = "v#compressed_image_size_bytes:" + str(image_byte_size) + "\n"
+                self.log_socket.send(to_log.encode("utf-8"))
+                to_log = "v#densecap_request_response_time:" + str(request_end_time - request_start_time) + "\n"
+                self.log_socket.send(to_log.encode("utf-8"))
+                self.log_socket.send("v#********************\n".encode("utf-8"))
+            except ConnectionError:
+                print("** The Dense Captioning service is not available")
+                exit(1)
+
+    def say_sentence(self):
+        if openai:
+            now = datetime.now()
+            date_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
+            to_log = "d#timestamp:" + date_time_str + "\n"
+            self.log_socket.send(to_log.encode("utf-8"))
+            random_sent = random.choice(self.sentences)
+            print("R:", random_sent)
+            # Log the time taken to say the random sentence
+            start_time = time.time()
+            tts = gTTS(random_sent, lang=language)
+            tts.save("audio.mp3")
+            playsound("audio.mp3")
+            # os.system("afplay audio.mp3")
+            # stream_and_play(random_sent)
+            end_time = time.time()
+            
+            to_log = "d#ack_sentence_speaking_time:" + str(end_time - start_time) + "\n"
+            self.log_socket.send(to_log.encode("utf-8"))
 
     def hub_request(self, data):
         encoded_data = json.dumps(data).encode('utf-8')
         compressed_data = zlib.compress(encoded_data)
+        start_time = time.time()
         hub_response = requests.put(request_uri, data=compressed_data, verify=False)
+        end_time = time.time()
         # If the Hub cannot contact the dialogue service, the response will be empty
         if hub_response:
             # Overwrite the array containing the states of the profiles with those contained in the Hub response
@@ -188,13 +246,18 @@ class CAIRclient:
             self.dialogue_sentence = hub_response.json()['dialogue_sentence']
 
             if data["req_type"] == 1:
+                to_log = "d#first_request_response_time:" + str(end_time - start_time) + "\n"
+                self.log_socket.send(to_log.encode("utf-8"))
                 # self.print_used_nuances(self.dialogue_state.dialogue_nuances)
                 self.dialogue_statistics = DialogueStatistics(d=hub_response.json()["dialogue_statistics"])
                 # The hub updates the average topic distance matrix, hence it should be written on the file
-                with open(self.dialogue_statistics_file_path, 'w') as f:
+                with open("dialogue_statistics.json", 'w') as f:
                     json.dump(self.dialogue_statistics.to_dict(), f, ensure_ascii=False, indent=4)
                 self.plan_sentence = hub_response.json()['plan_sentence']
                 self.plan = hub_response.json()['plan']
+            else:
+                to_log = "d#second_request_response_time:" + str(end_time-start_time) + "\n"
+                self.log_socket.send(to_log.encode("utf-8"))
         else:
             print("No response received from the Hub!")
             exit(0)
@@ -204,11 +267,12 @@ class CAIRclient:
         print("Trying to connect to the audio recorder socket.")
         try:
             self.client_socket.connect((audio_recorder_ip, 9090))
+            self.log_socket.connect((audio_recorder_ip, 9092))
         except ConnectionError:
             if language == "it":
-                to_say = "Mi dispiace, non riesco a connettermi al microfono. Controlla l'indirizzo I P e riprova."
+                to_say = "Mi dispiace, non riesco a connettermi al microfono o al servizio di log."
             else:
-                to_say = "I'm sorry, I can't connect to the microphone. Check the IP address and try again."
+                to_say = "I'm sorry, I can't connect to the microphone or the log service"
             print("R:", to_say)
             tts = gTTS(to_say, lang=language)
             tts.save(self.audio_file_path)
@@ -283,22 +347,20 @@ class CAIRclient:
                 os.remove(self.audio_file_path)
             # Tell the audio recorder that the client is ready to receive the user reply
             self.client_socket.send(self.dialogue_state.sentence_type.encode("utf-8"))
-            xml_string = self.client_socket.recv(1024).decode('utf-8')
+            # The first string received is just an ack that the user has finished talking (after 2s)
+            received_str = self.client_socket.recv(1024).decode('utf-8')
+            self.check_socket_connection(received_str)
+            print("** user finished talking **")
+            self.client_socket.send("ack".encode("utf-8"))
+            # When using openAI say something to fill the void while waiting
+            random_sent_thread = threading.Thread(None, self.say_sentence, args=())
+            random_sent_thread.start()
 
-            if xml_string == "":
-                if language == "it":
-                    to_say = "Mi dispiace, c'è stato qualche problema con la connessione al microfono esterno."
-                else:
-                    to_say = "I'm sorry, there was a problem with the connection to the external microphone."
-                print("R:", to_say)
-                tts = gTTS(to_say, lang=language)
-                tts.save(self.audio_file_path)
-                # duration = mp3_duration(self.audio_file_path)
-                # mic_err_thread = threading.Thread(None, gesture_service_client, args=("talk", duration, self.offset,))
-                # mic_err_thread.start()
-                playsound(self.audio_file_path)
-                # stream_and_play(to_say)
-                sys.exit(1)
+            # The second string received should be the xml client sentence
+            xml_string = self.client_socket.recv(1024).decode('utf-8')
+            print("** received user sentence **")
+            self.check_socket_connection(xml_string)
+
 
             # Do not proceed until the xml string is complete and all tags are closed
             proceed = False
@@ -423,9 +485,9 @@ class CAIRclient:
                 if self.plan_sentence:
                     print(str(self.plan_sentence))
                     self.utils.replace_speaker_name(self.plan_sentence, self.speakers_info)
-                    self.plan_sentence = self.utils.replace_schwa_in_string(self.plan_sentence, self.speakers_info,
-                                                                            speaker_id)
+                    self.plan_sentence = self.utils.replace_schwa_in_string(self.plan_sentence, self.speakers_info, speaker_id)
                     print("R:", self.plan_sentence)
+                    start_time = time.time()
                     tts = gTTS(self.plan_sentence, lang=language)
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
@@ -433,6 +495,9 @@ class CAIRclient:
                     plan_sent_thread.start()
                     time.sleep(1)
                     playsound(self.audio_file_path)
+                    end_time = time.time()
+                    to_log = "d#first_response_speaking_time:" + str(end_time - start_time) + "\n"
+                    self.log_socket.send(to_log.encode("utf-8"))
                     # os.system("afplay audio.mp3")
                     # stream_and_play(self.plan_sentence)
 
@@ -499,7 +564,7 @@ class CAIRclient:
                     dialogue_sentence2_str = self.utils.replace_speaker_name(dialogue_sentence2_history,
                                                                              self.speakers_info)
                     print("R:", dialogue_sentence2_str)
-                    
+                    start_time = time.time()
                     tts = gTTS(dialogue_sentence2_str, lang=language)
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
@@ -509,7 +574,11 @@ class CAIRclient:
                     dialogue2_thread.start()
                     time.sleep(1)
                     playsound(self.audio_file_path)
+                    end_time = time.time()
                     # stream_and_play(dialogue_sentence2_str)
+                    to_log = "d#second_sentence_speaking_time:" + str(end_time - start_time) + "\n"
+                    self.log_socket.send(to_log.encode("utf-8"))
+                    self.log_socket.send("d#********************\n".encode("utf-8"))
                 else:
                     dialogue_sentence2_history = ""
 

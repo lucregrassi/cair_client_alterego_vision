@@ -8,9 +8,9 @@
         "contextual_speech_act": [0, 0, 0, 0, 1]
     },
     "values": {
-        "diversity": ["italian", "good mental health", "no physical problems"],
-        "time": ["morning", "autumn", "almost Christmas"],
-        "place": ["workshop", "San Quirico", "Italy"],
+        "diversity": ["italian", "of good mental health", "of good physical health"],
+        "time": ["morning", "spring", "before the boarding on a cruise ship"],
+        "place": ["maritime station", "Genoa's harbour", "Italy"],
         "tone": ["humorous", "kind", "dramatic", "controversial", "aggressive", "teasing", "alarmist",
                  "worried", "neutral"],
         "positive_speech_act": ["assertive", "commissive", "expressive"],
