@@ -532,7 +532,7 @@ class CAIRclient:
                 duration = mp3_duration(self.audio_file_path)
                 dialogue1_thread = threading.Thread(None, self.gesture_service_client, args=(filename, duration, self.offset,))
                 # Wait for the previous gesture thread to finish
-                rand_sent_thread.join()
+                random_sent_thread.join()
                 dialogue1_thread.start()
                 time.sleep(1)
                 playsound(self.audio_file_path)
