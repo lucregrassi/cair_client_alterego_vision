@@ -1,4 +1,4 @@
-requests~=2.28.1
+requests
 azure-cognitiveservices-speech
 numpy
 google-cloud-speech
