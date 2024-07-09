@@ -602,14 +602,14 @@ class CAIRclient:
                 req2_thread.start()
 
                 start_time = time.time()
+                dialogue1_thread = threading.Thread(None, self.gesture_service_client,
+                                                    args=(filename, duration, self.offset,))
                 # Avoid speaking first part of dialogue sentence if empty (when there is an action intervention)
                 if dialogue_sentence1_str != "":
                     print("REPLY:", dialogue_sentence1_str)
                     tts = gTTS(dialogue_sentence1_str, lang=language.split('-')[0])
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
-                    dialogue1_thread = threading.Thread(None, self.gesture_service_client,
-                                                        args=(filename, duration, self.offset,))
                     # Wait for the previous gesture thread to finish
                     filler_sentence_thread.join()
                     dialogue1_thread.start()
@@ -627,6 +627,8 @@ class CAIRclient:
                     print("Connection with Hub lost")
                     exit(1)
 
+                dialogue2_thread = threading.Thread(None, self.gesture_service_client,
+                                                    args=(filename, duration, self.offset,))
                 if self.dialogue_sentence[1][1] != "":
                     dialogue_sentence2 = self.dialogue_sentence[1:]
                     dialogue_sentence2_history = self.utils.process_sentence(dialogue_sentence2, self.speakers_info)
@@ -638,8 +640,6 @@ class CAIRclient:
                     tts = gTTS(dialogue_sentence2_str, lang=language.split('-')[0])
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
-                    dialogue2_thread = threading.Thread(None, self.gesture_service_client,
-                                                        args=(filename, duration, self.offset,))
                     # Wait for the previous gesture thread to finish
                     dialogue1_thread.join()
                     dialogue2_thread.start()
