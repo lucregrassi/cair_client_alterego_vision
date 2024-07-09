@@ -448,7 +448,7 @@ class CAIRclient:
 
             # Initialize and start the thread that says something to fill the void while waiting
             filler_sentence_thread = threading.Thread(None, self.say_filler_sentence, args=())
-            if due_intervention is None:
+            if self.due_intervention["type"] is None:
                 filler_sentence_thread.start()
 
             sentence = sentence.replace(".", "")
