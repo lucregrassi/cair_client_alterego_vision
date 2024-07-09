@@ -27,8 +27,6 @@ import xml
 import sys
 import re
 import os
-import io
-import openai
 import rospy
 import rospkg
 from datetime import datetime
@@ -42,10 +40,20 @@ log_data = False
 
 lab_server = "130.251.13.192"
 
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+try:
+    # This IP doesn't need to be reachable, it's used only to get the local IP
+    s.connect(('8.8.8.8', 1))
+    local = s.getsockname()[0]
+except ConnectionError:
+    local = '127.0.0.1'
+finally:
+    s.close()
+
 # Set the location of the server
 server_ip = lab_server
-audio_recorder_ip = "130.251.13.117"
-registration_ip = "130.251.13.117"
+audio_recorder_ip = local
+registration_ip = local
 language = "it-IT"
 MAX_HISTORY_TURNS = 6
 # Silence time in seconds after which we consider the conversation not ongoing
