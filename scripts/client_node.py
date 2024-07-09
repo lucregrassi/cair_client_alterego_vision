@@ -6,12 +6,8 @@ from cair_libraries.dialogue_turn import DialogueTurn
 from cair_libraries.client_alterego_utils import AlteregoClientUtils
 from playsound import playsound
 from gtts import gTTS
-from openai import OpenAI
-from pydub import AudioSegment
-from pydub.playback import play
 from mutagen.mp3 import MP3
 from mutagen import MutagenError
-from dotenv import load_dotenv, find_dotenv
 from cairclient_alterego_vision.srv import GestureService
 import xml.etree.ElementTree as ET
 import pygame.camera
@@ -40,6 +36,7 @@ dense_cap = False
 log_data = False
 
 lab_server = "130.251.13.192"
+local_server = "130.251.13.122"
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 try:
@@ -52,7 +49,7 @@ finally:
     s.close()
 
 # Set the location of the server
-server_ip = lab_server
+server_ip = local_server
 audio_recorder_ip = local
 registration_ip = local
 language = "it-IT"
