@@ -672,8 +672,8 @@ class CAIRclient:
                         repeat_continuation = map_language_sentence[language] + self.dialogue_state.prev_dialogue_sentence[-1][1]
                         print("REPEAT CONTINUATION:", repeat_continuation)
                         tts = gTTS(repeat_continuation, lang=language.split('-')[0])
-                        tts.save("audio.mp3")
-                        playsound("audio.mp3")
+                        tts.save(self.audio_file_path)
+                        playsound(self.audio_file_path)
 
 
 if __name__ == '__main__':
