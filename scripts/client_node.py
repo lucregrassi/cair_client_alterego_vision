@@ -339,14 +339,12 @@ class CAIRclient:
 
     def start_dialogue(self):
         global language
-        global input_method
         ongoing_conversation = True
 
         print("Starting personalization server in thread")
         self.personalization_data.start_server_in_thread()
 
-        if input_method == "m":
-            self.connect_to_audio_and_log_services()
+        self.connect_to_audio_and_log_services()
 
         self.initialize_user_session()
         self.load_conversation_state()
