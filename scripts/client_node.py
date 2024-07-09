@@ -10,6 +10,7 @@ from openai import OpenAI
 from pydub import AudioSegment
 from pydub.playback import play
 from mutagen.mp3 import MP3
+from mutagen import MutagenError
 from dotenv import load_dotenv, find_dotenv
 from cairclient_alterego_vision.srv import GestureService
 import xml.etree.ElementTree as ET
@@ -75,7 +76,8 @@ def mp3_duration(path):
         audio = MP3(path)
         length = audio.info.length
         return length
-    except:
+    except (MutagenError, IOError) as e:
+        print(f"An error occurred: {e}")
         return None
 
 
@@ -602,8 +604,7 @@ class CAIRclient:
                 req2_thread.start()
 
                 start_time = time.time()
-                dialogue1_thread = threading.Thread(None, self.gesture_service_client,
-                                                    args=(filename, duration, self.offset,))
+                dialogue1_thread = None
                 # Avoid speaking first part of dialogue sentence if empty (when there is an action intervention)
                 if dialogue_sentence1_str != "":
                     print("REPLY:", dialogue_sentence1_str)
@@ -612,6 +613,8 @@ class CAIRclient:
                     duration = mp3_duration(self.audio_file_path)
                     # Wait for the previous gesture thread to finish
                     filler_sentence_thread.join()
+                    dialogue1_thread = threading.Thread(None, self.gesture_service_client,
+                                                        args=(filename, duration, self.offset,))
                     dialogue1_thread.start()
                     time.sleep(1)
                     playsound(self.audio_file_path)
@@ -627,8 +630,6 @@ class CAIRclient:
                     print("Connection with Hub lost")
                     exit(1)
 
-                dialogue2_thread = threading.Thread(None, self.gesture_service_client,
-                                                    args=(filename, duration, self.offset,))
                 if self.dialogue_sentence[1][1] != "":
                     dialogue_sentence2 = self.dialogue_sentence[1:]
                     dialogue_sentence2_history = self.utils.process_sentence(dialogue_sentence2, self.speakers_info)
@@ -641,7 +642,12 @@ class CAIRclient:
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
                     # Wait for the previous gesture thread to finish
-                    dialogue1_thread.join()
+                    if dialogue1_thread is not None:
+                        dialogue1_thread.join()
+                    else:
+                        print("The thread 'dialogue1_thread' has not been defined or started.")
+                    dialogue2_thread = threading.Thread(None, self.gesture_service_client,
+                                                        args=(filename, duration, self.offset,))
                     dialogue2_thread.start()
                     time.sleep(1)
                     playsound(self.audio_file_path)
