@@ -57,7 +57,8 @@ MAX_HISTORY_TURNS = 6
 # Silence time in seconds after which we consider the conversation not ongoing
 SILENCE_THRESHOLD = 300
 
-server_port = "12345"
+# Port for the Hub and Dialogue Manager using different ontology
+server_port = "12348"
 img_port = "12348"
 
 BASE_CAIR_hub = "http://" + server_ip + ":" + server_port + "/CAIR_hub"
@@ -551,7 +552,9 @@ class CAIRclient:
                         (self.utils.replace_schwa_in_string(self.plan_sentence, self.speakers_info, speaker_id))
                     tts = gTTS(self.plan_sentence, lang=language.split('-')[0])
                     tts.save(self.audio_file_path)
-                    playsound(self.audio_file_path)
+                    # If there is a plan, say the sentence while waving the hand
+                    if not self.plan:
+                        playsound(self.audio_file_path)
                     # os.system("afplay audio.mp3")
                     # stream_and_play(self.plan_sentence)
 
@@ -565,6 +568,14 @@ class CAIRclient:
                             # The function that manages the registration, updates the files and returns the updated
                             # dictionaries, so that we don't have to read from the files at each turn.
                             self.speakers_info, self.dialogue_statistics = self.utils.registration_procedure(language)
+                        elif action == "attention" or action == "hello":
+                            filename = "greet.bag"
+                            attention_thread = threading.Thread(None, self.gesture_service_client,
+                                                              args=(filename, 0, 0,))
+                            filename = "talk" + str(random.randint(0, 9)) + ".bag"
+                            attention_thread.start()
+                            playsound(self.audio_file_path)
+                            attention_thread.join()
                         else:
                             if language == "it-IT":
                                 to_say = action
@@ -609,7 +620,8 @@ class CAIRclient:
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
                     # Wait for the previous gesture thread to finish
-                    filler_sentence_thread.join()
+                    if self.due_intervention["type"] is None:
+                        filler_sentence_thread.join()
                     dialogue1_thread = threading.Thread(None, self.gesture_service_client,
                                                         args=(filename, duration, self.offset,))
                     dialogue1_thread.start()
