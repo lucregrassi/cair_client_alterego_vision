@@ -619,9 +619,6 @@ class CAIRclient:
                     tts = gTTS(dialogue_sentence1_str, lang=language.split('-')[0])
                     tts.save(self.audio_file_path)
                     duration = mp3_duration(self.audio_file_path)
-                    # Wait for the previous gesture thread to finish
-                    if self.due_intervention["type"] is None:
-                        filler_sentence_thread.join()
                     dialogue1_thread = threading.Thread(None, self.gesture_service_client,
                                                         args=(filename, duration, self.offset,))
                     dialogue1_thread.start()
