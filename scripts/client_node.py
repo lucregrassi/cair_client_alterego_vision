@@ -640,9 +640,10 @@ class CAIRclient:
                     duration = mp3_duration(self.audio_file_path)
                     # Wait for the previous gesture thread to finish
                     if dialogue1_thread is not None:
+                        print("Waiting for dialogue1_thread...")
                         dialogue1_thread.join()
                     else:
-                        print("The thread 'dialogue1_thread' has not been defined or started.")
+                        print("dialogue1_thread has not been defined or started.")
                     dialogue2_thread = threading.Thread(None, self.gesture_service_client,
                                                         args=(filename, duration, self.offset,))
                     dialogue2_thread.start()
@@ -673,6 +674,11 @@ class CAIRclient:
                         print("REPEAT CONTINUATION:", repeat_continuation)
                         tts = gTTS(repeat_continuation, lang=language.split('-')[0])
                         tts.save(self.audio_file_path)
+                        duration = mp3_duration(self.audio_file_path)
+                        dialogue2_thread = threading.Thread(None, self.gesture_service_client,
+                                                            args=(filename, duration, self.offset,))
+                        dialogue2_thread.start()
+                        time.sleep(1)
                         playsound(self.audio_file_path)
 
 
