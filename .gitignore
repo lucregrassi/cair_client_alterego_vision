@@ -4,6 +4,8 @@ common/dialogue_statistics.json
 common/speakers_info.json
 common/camera_image.jpg
 common/audio.mp3
+certificates
+.idea
 
 devel/
 logs/
