@@ -5,10 +5,9 @@ from cair_libraries.dialogue_state import DialogueState
 from cair_libraries.dialogue_turn import DialogueTurn
 from cair_libraries.client_alterego_utils import AlteregoClientUtils
 from playsound import playsound
+from datetime import datetime
 from gtts import gTTS
-from mutagen.mp3 import MP3
-from mutagen import MutagenError
-from cairclient_alterego_vision.srv import GestureService
+from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
 import pygame.camera
 import threading
@@ -24,9 +23,17 @@ import xml
 import sys
 import re
 import os
+from mutagen.mp3 import MP3
+from mutagen import MutagenError
 import rospy
 import rospkg
-from datetime import datetime
+from cairclient_alterego_vision.srv import GestureService
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Access environment variables
+openai_api_key = os.getenv('OPENAI_API_KEY')
 
 rp = rospkg.RosPack()
 package_path = rp.get_path('cairclient_alterego_vision')
@@ -38,6 +45,7 @@ log_data = False
 lab_server = "130.251.13.192"
 local_server = "130.251.13.122"
 
+# Get the private IP of the computer for the local network
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 try:
     # This IP doesn't need to be reachable, it's used only to get the local IP
@@ -50,6 +58,7 @@ finally:
 
 # Set the location of the server
 server_ip = lab_server
+certificate = package_path + "/certificates/server_" + server_ip.replace(".", "_") + ".crt"
 audio_recorder_ip = local
 registration_ip = local
 language = "it-IT"
@@ -61,7 +70,7 @@ SILENCE_THRESHOLD = 300
 server_port = "12348"
 img_port = "12348"
 
-BASE_CAIR_hub = "http://" + server_ip + ":" + server_port + "/CAIR_hub"
+BASE_CAIR_hub = "https://" + server_ip + ":" + server_port + "/CAIR_hub"
 img_url = "http://" + server_ip + ":" + img_port + "/CAIR_dense_captioning"
 
 # If dense captioning is set to false the dense_cap_result will be sent empty to the server and the
@@ -111,7 +120,7 @@ class CAIRclient:
         self.sentences = {}
         languages = ["it-IT", "en-US", "fr-FR", "es-ES"]
         for lan in languages:
-            with open(os.path.join(folder_path, "trigger_sentences_" + lan + ".txt")) as f:
+            with open(os.path.join(folder_path, "filler_sentences_" + lan + ".txt")) as f:
                 self.sentences[lan] = [line.rstrip() for line in f]
 
         self.dense_cap = dense_cap
@@ -120,7 +129,7 @@ class CAIRclient:
         self.log_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.log_data = log_data
         self.due_intervention = {"type": None, "exclusive": False}
-        self.personalization_data = PersonalizationServer()
+        self.personalization_server = PersonalizationServer()
         self.offset = 0.0
 
     def gesture_service_client(self, filename, audio_duration, offset):
@@ -222,7 +231,6 @@ class CAIRclient:
         playsound(self.audio_file_path)
         end_time = time.time()
         #   os.system("afplay audio.mp3")
-        # stream_and_play(filler_sentence)
         to_log = "d#ack_sentence_speaking_time:" + str(end_time - start_time) + "\n"
         self.send_log_data(to_log)
 
@@ -252,7 +260,7 @@ class CAIRclient:
             print("First user!")
             # This function creates the speakers_info and the speakers_sequence_stats files and initializes them
             # with the info of a generic user
-            welcome_sentence_str = self.utils.acquire_initial_state(language)
+            welcome_sentence_str = self.utils.acquire_initial_state(language, openai_api_key)
             # Retrieve starting nuance vectors
             with open(self.nuance_vectors_file_path) as f:
                 self.nuance_vectors = json.load(f)
@@ -310,47 +318,61 @@ class CAIRclient:
         encoded_data = json.dumps(data).encode('utf-8')
         compressed_data = zlib.compress(encoded_data)
         start_time = time.time()
-        hub_response = requests.get(BASE_CAIR_hub, data=compressed_data, verify=False)
-        end_time = time.time()
-        # If the Hub cannot contact the dialogue service, the response will be empty
-        if hub_response:
-            error = hub_response.json().get("error", "")
-            if error != "":
-                print(error)
-                exit(1)
-            # Overwrite the array containing the states of the profiles with those contained in the Hub response
-            # The speakers info are not sent to the Hub.
-            self.dialogue_state = DialogueState(d=hub_response.json()['dialogue_state'])
-            # Store the updated dialogue state in the file
-            with open(self.dialogue_state_file_path, 'w') as f:
-                json.dump(self.dialogue_state.to_dict(), f, ensure_ascii=False, indent=4)
-            self.dialogue_sentence = hub_response.json()['dialogue_sentence']
+        try:
+            # Try making the POST request
+            hub_response = requests.post(BASE_CAIR_hub, data=compressed_data, verify=certificate)
+            end_time = time.time()
 
-            if data["req_type"] == "reply":
-                to_log = "d#first_request_response_time:" + str(end_time - start_time) + "\n"
-                self.send_log_data(to_log)
-                # self.print_used_nuances(self.dialogue_state.dialogue_nuances)
-                self.dialogue_statistics = DialogueStatistics(d=hub_response.json()["dialogue_statistics"])
-                # The hub updates the average topic distance matrix, hence it should be written on the file
-                with open(self.dialogue_statistics_file_path, 'w') as f:
-                    json.dump(self.dialogue_statistics.to_dict(), f, ensure_ascii=False, indent=4)
-                self.plan_sentence = hub_response.json()['plan_sentence']
-                self.plan = hub_response.json()['plan']
-                self.due_intervention = hub_response.json()["due_intervention"]
-                print("Due intervention returned by Hub:", self.due_intervention)
+            # Check if the response is valid
+            if hub_response:
+                error = hub_response.json().get("error", "")
+                if error != "":
+                    print(f"Error from Hub: {error}")
+                    sys.exit(1)
+
+                # Process the valid response from the server
+                self.dialogue_state = DialogueState(d=hub_response.json()['dialogue_state'])
+
+                # Store the updated dialogue state
+                with open(self.dialogue_state_file_path, 'w') as f:
+                    json.dump(self.dialogue_state.to_dict(), f, ensure_ascii=False, indent=4)
+                self.dialogue_sentence = hub_response.json()['dialogue_sentence']
+
+                if data["req_type"] == "reply":
+                    to_log = "d#first_request_response_time:" + str(end_time - start_time) + "\n"
+                    self.send_log_data(to_log)
+                    self.dialogue_statistics = DialogueStatistics(d=hub_response.json()["dialogue_statistics"])
+
+                    # Store updated dialogue statistics
+                    with open(self.dialogue_statistics_file_path, 'w') as f:
+                        json.dump(self.dialogue_statistics.to_dict(), f, ensure_ascii=False, indent=4)
+
+                    self.plan_sentence = hub_response.json()['plan_sentence']
+                    self.plan = hub_response.json()['plan']
+                    self.due_intervention = hub_response.json()["due_intervention"]
+                    print("Due intervention returned by Hub:", self.due_intervention)
+                else:
+                    to_log = "d#second_request_response_time:" + str(end_time - start_time) + "\n"
+                    self.send_log_data(to_log)
             else:
-                to_log = "d#second_request_response_time:" + str(end_time-start_time) + "\n"
-                self.send_log_data(to_log)
-        else:
-            print("No response received from the Hub!")
-            self.connection_lost = True
+                print("No response received from the Hub!")
+                self.connection_lost = True
+
+        except requests.exceptions.RequestException as e:
+            # Handle any exception related to the request
+            print(f"Request failed: {e}")
+            sys.exit(1)
+        except Exception as e:
+            # Catch any other exceptions
+            print(f"An unexpected error occurred: {e}")
+            sys.exit(1)
 
     def start_dialogue(self):
         global language
         ongoing_conversation = True
 
         print("Starting personalization server in thread")
-        self.personalization_data.start_server_in_thread()
+        self.personalization_server.start_server_in_thread()
 
         self.connect_to_audio_and_log_services()
 
@@ -376,7 +398,7 @@ class CAIRclient:
                 ongoing_conversation = False
 
             # Check if there is a due scheduled intervention
-            due_intervention = self.personalization_data.get_due_intervention()
+            due_intervention = self.personalization_server.get_due_intervention()
 
             # If there is no scheduled intervention, reset the type of the class variable to None, meaning that the
             # xml_string will contain a user sentence and not a intervention sentence
@@ -519,6 +541,7 @@ class CAIRclient:
 
                 # Compose the payload of the message to be sent to the server
                 data = {"req_type": "reply",
+                        "openai_api_key": openai_api_key,
                         "client_sentence": xml_string, "language": language,
                         "due_intervention": self.due_intervention,
                         "dialogue_state": self.dialogue_state.to_dict(),
@@ -571,7 +594,7 @@ class CAIRclient:
                         elif action == "attention" or action == "hello":
                             filename = "greet.bag"
                             attention_thread = threading.Thread(None, self.gesture_service_client,
-                                                              args=(filename, 0, 0,))
+                                                                args=(filename, 0, 0,))
                             filename = "talk" + str(random.randint(0, 9)) + ".bag"
                             attention_thread.start()
                             playsound(self.audio_file_path)
@@ -626,7 +649,6 @@ class CAIRclient:
                     playsound(self.audio_file_path)
                     end_time = time.time()
                     # os.system("afplay audio.mp3")
-                    # stream_and_play(dialogue_sentence1_str)
                     to_log = "d#first_response_speaking_time:" + str(end_time - start_time) + "\n"
                     self.send_log_data(to_log)
 
@@ -670,6 +692,7 @@ class CAIRclient:
                     self.dialogue_state.conversation_history.append(
                         {"role": "assistant", "content": dialogue_sentence1_history + " " + dialogue_sentence2_history})
                     self.dialogue_state.prev_dialogue_sentence = self.dialogue_sentence
+                    self.previous_sentence = self.dialogue_sentence[1][1]
                 # If there is no continuation response it means there was an action intervention
                 else:
                     # If there was an ongoing conversation, repeat the previous continuation sentence
