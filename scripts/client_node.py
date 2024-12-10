@@ -49,7 +49,7 @@ finally:
     s.close()
 
 # Set the location of the server
-server_ip = local_server
+server_ip = lab_server
 audio_recorder_ip = local
 registration_ip = local
 language = "it-IT"
