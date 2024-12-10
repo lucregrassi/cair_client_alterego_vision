@@ -91,7 +91,7 @@ def mp3_duration(path):
 class CAIRclient:
     def __init__(self):
         # Instances of the classes of the other files in the libs folder containing functions needed here
-        self.utils = AlteregoClientUtils(server_port, server_ip, registration_ip)
+        self.utils = AlteregoClientUtils(server_port, server_ip, registration_ip, certificate)
         self.isAlive = True
         self.exit_keywords = ["stop talking", "esci dallapp", "esci dallapplicazione", "quit the application"]
         self.repeat_keywords = ["repeat", "can you repeat", "say it again", "puoi ripetere", "ripeti", "non ho capito"]
