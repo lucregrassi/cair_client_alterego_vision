@@ -1,14 +1,14 @@
 import rospy
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import Twist
 import socket
 import threading
 
 
-class TeleoperationManager:
+class CairTeleoperation:
     def __init__(self, command_port=54321):
         # ROS publisher
-        self.pub = rospy.Publisher('/robot_alterego6/wheels/segway_des_vel', TwistStamped, queue_size=10)
-        rospy.init_node('teleoperation_manager', anonymous=True)
+        self.pub = rospy.Publisher('/robot_alterego6/cmd_vel', Twist, queue_size=10)
+        rospy.init_node('cair_teleoperation', anonymous=True)
 
         # UDP configuration
         self.command_port = command_port
@@ -32,24 +32,23 @@ class TeleoperationManager:
                 rospy.logerr(f"Error in UDP listener: {e}")
 
     def handle_command(self, command):
-        twist_msg = TwistStamped()
+        twist_msg = Twist()
         if command == "MOVE_FORWARD":
-            twist_msg.twist.linear.x = 0.6
+            twist_msg.linear.x = 1
         elif command == "MOVE_BACKWARD":
-            twist_msg.twist.linear.x = -0.6
+            twist_msg.linear.x = -1
         elif command == "ROTATE_LEFT":
-            twist_msg.twist.angular.z = 0.2
+            twist_msg.angular.z = 0.3
         elif command == "ROTATE_RIGHT":
-            twist_msg.twist.angular.z = -0.2
+            twist_msg.angular.z = -0.3
         elif command == "STOP":
-            twist_msg.twist.linear.x = 0.0
-            twist_msg.twist.angular.z = 0.0
+            twist_msg.linear.x = 0.0
+            twist_msg.angular.z = 0.0
         else:
             rospy.logwarn(f"Unknown command: {command}")
             return
 
-        # Publish the TwistStamped message
-        twist_msg.header.stamp = rospy.Time.now()
+        # Publish the Twist message
         self.pub.publish(twist_msg)
         rospy.loginfo(f"Published message: {twist_msg}")
 
@@ -59,11 +58,11 @@ class TeleoperationManager:
 
 
 if __name__ == "__main__":
-    manager = TeleoperationManager()
+    manager = CairTeleoperation()
     try:
         rospy.loginfo("Starting UDP listener...")
         manager.start_udp_listener()
         rospy.spin()  # Keep the ROS node running
     except rospy.ROSInterruptException:
-        rospy.loginfo("Shutting down TeleoperationManager.")
+        rospy.loginfo("Shutting down CairTeleoperation.")
         manager.stop_udp_listener()

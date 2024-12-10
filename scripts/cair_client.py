@@ -731,6 +731,6 @@ if __name__ == '__main__':
         language = args.language
         print("The language has been set to", language)
 
-    rospy.init_node('gesture_service_client', anonymous=False)
+    rospy.init_node('cair_client', anonymous=False)
     cair_client = CAIRclient()
     cair_client.start_dialogue()
